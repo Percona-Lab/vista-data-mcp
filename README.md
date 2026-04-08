@@ -4,6 +4,23 @@ Read-only MCP server for querying **ClickHouse** (product telemetry) and **Elast
 
 Both data sources are optional — configure one or both depending on what you have access to.
 
+## Install (one command)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/install-vista-data-mcp | bash
+```
+
+The installer will:
+1. Install `uv` if needed
+2. Clone this repo to `~/vista-data-mcp`
+3. Prompt for your ClickHouse and/or Elasticsearch credentials
+4. Auto-detect and configure Claude Desktop, Claude Code, and CLI
+5. Persist across reboots — the MCP config points to the cloned repo on disk
+
+Re-run the same command to update or change credentials.
+
+---
+
 ## Tools
 
 ### ClickHouse (telemetry)
@@ -29,9 +46,11 @@ All results are returned as Markdown tables. Only read-only queries are allowed.
 
 ---
 
-## Quick Start
+## Manual Install (alternative)
 
-### 1. Install in Claude Code (CLI)
+If you prefer not to use the installer:
+
+### Claude Code (CLI)
 
 ```bash
 claude mcp add vista-data \
@@ -49,9 +68,7 @@ claude mcp add vista-data \
   -- uvx --from git+https://github.com/Percona-Lab/vista-data-mcp vista-data-mcp
 ```
 
-Skip any `-e` lines for data sources you don't have credentials for — tools for unconfigured sources will return a helpful message instead of failing.
-
-### 2. Install in Claude Desktop
+### Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -82,16 +99,13 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop after editing. Remove any env vars you don't need.
-
-### 3. Run locally (development)
+### Development
 
 ```bash
 git clone https://github.com/Percona-Lab/vista-data-mcp.git
 cd vista-data-mcp
 cp .env.example .env
 # Edit .env with your credentials
-
 uv run mcp_server.py
 ```
 
