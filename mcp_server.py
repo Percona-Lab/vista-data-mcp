@@ -14,7 +14,7 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "vista-data",
-    description=(
+    instructions=(
         "Read-only access to Percona product data across ClickHouse (telemetry: "
         "active instances, version distribution, storage engines, deployment types) "
         "and Elasticsearch (downloads: product downloads by type, OS, package, growth rates). "
