@@ -74,10 +74,11 @@ def ask(prompt: str, default: str = "") -> str:
 
 
 def ask_secret(prompt: str, default: str = "") -> str:
-    """Ask for a secret value (password) — still echoes for simplicity."""
+    """Ask for a secret value (password) — input is hidden."""
+    import getpass
     display_default = " [****]" if default else ""
     try:
-        value = input(f"  {prompt}{display_default}: ").strip()
+        value = getpass.getpass(f"  {prompt}{display_default}: ").strip()
         return value if value else default
     except (EOFError, KeyboardInterrupt):
         print()
