@@ -276,17 +276,47 @@ def get_claude_desktop_config_path() -> Path | None:
     return None
 
 
-def build_mcp_entry(install_dir: Path, env: dict) -> dict:
-    entry = {
-        "command": "uv",
+def write_env_file(install_dir: Path, env: dict) -> Path:
+    """Write credentials to .env file. Returns the path."""
+    env_path = install_dir / ".env"
+    lines = []
+    for k, v in env.items():
+        if v:
+            lines.append(f"{k}={v}")
+    env_path.write_text("\n".join(lines) + "\n")
+    # Restrict permissions — owner-only read/write
+    env_path.chmod(0o600)
+    info(f"Credentials saved to {env_path} (mode 600)")
+    return env_path
+
+
+def resolve_uv_path() -> str:
+    """Find the full path to uv so Claude Desktop can locate it."""
+    result = subprocess.run(["which", "uv"], capture_output=True, text=True, check=False)
+    if result.returncode == 0:
+        return result.stdout.strip()
+    # Fallback: check common locations
+    for candidate in [
+        Path.home() / ".local" / "bin" / "uv",
+        Path.home() / ".cargo" / "bin" / "uv",
+        Path("/opt/homebrew/bin/uv"),
+        Path("/usr/local/bin/uv"),
+    ]:
+        if candidate.exists():
+            return str(candidate)
+    return "uv"  # last resort, hope it's on PATH
+
+
+def build_mcp_entry(install_dir: Path, env_path: Path) -> dict:
+    uv = resolve_uv_path()
+    return {
+        "command": uv,
         "args": ["run", "--directory", str(install_dir), "mcp_server.py"],
+        "env": {"DOTENV_PATH": str(env_path)},
     }
-    if env:
-        entry["env"] = {k: v for k, v in env.items() if v}
-    return entry
 
 
-def configure_json_file(config_path: Path, install_dir: Path, env: dict, label: str) -> bool:
+def configure_json_file(config_path: Path, install_dir: Path, env_path: Path, label: str) -> bool:
     if not config_path.parent.exists():
         if not ask_yn(f"{label} config dir not found at {config_path.parent}.\n  Configure anyway?", default=False):
             return False
@@ -302,14 +332,14 @@ def configure_json_file(config_path: Path, install_dir: Path, env: dict, label: 
                 return False
 
     config.setdefault("mcpServers", {})
-    config["mcpServers"][MCP_SERVER_NAME] = build_mcp_entry(install_dir, env)
+    config["mcpServers"][MCP_SERVER_NAME] = build_mcp_entry(install_dir, env_path)
 
     config_path.write_text(json.dumps(config, indent=2) + "\n")
     info(f"Configured {label}: {config_path}")
     return True
 
 
-def configure_ai_clients(install_dir: Path, env: dict) -> bool:
+def configure_ai_clients(install_dir: Path, env_path: Path) -> bool:
     print(c(BOLD, "Configuring AI clients..."))
     any_configured = False
 
@@ -318,24 +348,24 @@ def configure_ai_clients(install_dir: Path, env: dict) -> bool:
     if desktop_path is not None:
         if desktop_path.parent.exists():
             info("Claude Desktop detected — auto-configuring...")
-            if configure_json_file(desktop_path, install_dir, env, "Claude Desktop"):
+            if configure_json_file(desktop_path, install_dir, env_path, "Claude Desktop"):
                 any_configured = True
         else:
             print(f"  {DIM}Claude Desktop not detected ({desktop_path.parent}){NC}")
             if ask_yn("Configure Claude Desktop MCP anyway?", default=False):
-                if configure_json_file(desktop_path, install_dir, env, "Claude Desktop"):
+                if configure_json_file(desktop_path, install_dir, env_path, "Claude Desktop"):
                     any_configured = True
 
     # Claude Code — settings.json
     code_settings_path = Path.home() / ".claude" / "settings.json"
     if code_settings_path.parent.exists():
         info("Claude Code detected — auto-configuring settings.json...")
-        if configure_json_file(code_settings_path, install_dir, env, "Claude Code"):
+        if configure_json_file(code_settings_path, install_dir, env_path, "Claude Code"):
             any_configured = True
     else:
         print(f"  {DIM}Claude Code not detected ({code_settings_path.parent}){NC}")
         if ask_yn("Configure Claude Code MCP anyway?", default=False):
-            if configure_json_file(code_settings_path, install_dir, env, "Claude Code"):
+            if configure_json_file(code_settings_path, install_dir, env_path, "Claude Code"):
                 any_configured = True
 
     print()
@@ -393,7 +423,13 @@ def main() -> None:
     setup_python(install_dir)
 
     env = collect_credentials()
-    any_configured = configure_ai_clients(install_dir, env)
+    if env:
+        env_path = write_env_file(install_dir, env)
+    else:
+        env_path = install_dir / ".env"
+        if not env_path.exists():
+            env_path.write_text("# Add credentials here and re-run the installer\n")
+    any_configured = configure_ai_clients(install_dir, env_path)
     print_done(any_configured, env)
 
 

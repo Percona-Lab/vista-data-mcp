@@ -9,6 +9,19 @@ https://github.com/Percona-Lab/VISTA
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+# Load credentials from .env file if DOTENV_PATH is set or .env exists next to this script
+_dotenv_path = os.getenv("DOTENV_PATH") or str(Path(__file__).parent / ".env")
+if Path(_dotenv_path).is_file():
+    with open(_dotenv_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                key, value = key.strip(), value.strip()
+                if not os.getenv(key):  # don't override existing env vars
+                    os.environ[key] = value
 
 from mcp.server.fastmcp import FastMCP
 
