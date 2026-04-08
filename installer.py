@@ -205,8 +205,8 @@ def clone_or_pull(install_dir: Path, is_rerun: bool) -> None:
 def setup_python(install_dir: Path) -> None:
     print(c(BOLD, "Installing Python dependencies..."))
 
-    info("Running uv pip install...")
-    run(["uv", "pip", "install", "-e", ".", "--quiet"], cwd=install_dir)
+    info("Running uv sync...")
+    run(["uv", "sync", "--quiet"], cwd=install_dir)
 
     info("Dependencies ready.")
     print()
@@ -296,7 +296,9 @@ def configure_json_file(config_path: Path, install_dir: Path, env: dict, label: 
         try:
             config = json.loads(config_path.read_text())
         except json.JSONDecodeError:
-            warn(f"Could not parse {config_path} — will overwrite.")
+            warn(f"Could not parse {config_path}.")
+            if not ask_yn(f"Overwrite {config_path}?", default=False):
+                return False
 
     config.setdefault("mcpServers", {})
     config["mcpServers"][MCP_SERVER_NAME] = build_mcp_entry(install_dir, env)
@@ -334,11 +336,6 @@ def configure_ai_clients(install_dir: Path, env: dict) -> bool:
         if ask_yn("Configure Claude Code MCP anyway?", default=False):
             if configure_json_file(code_settings_path, install_dir, env, "Claude Code"):
                 any_configured = True
-
-    # Claude Code — ~/.claude.json (CLI)
-    cli_config_path = Path.home() / ".claude.json"
-    if configure_json_file(cli_config_path, install_dir, env, "Claude Code CLI"):
-        any_configured = True
 
     print()
     return any_configured
