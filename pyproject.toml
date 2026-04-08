@@ -1,14 +1,14 @@
 [project]
-name = "clickhouse-mcp-server"
+name = "vista-data-mcp"
 version = "0.1.0"
-description = "Read-only ClickHouse MCP server for product telemetry and analytics. Part of Percona VISTA."
+description = "Read-only ClickHouse + Elasticsearch MCP server for Percona VISTA — product telemetry and download analytics."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [
     { name = "Percona Lab", email = "info@percona.com" },
 ]
-keywords = ["mcp", "clickhouse", "telemetry", "analytics", "percona", "vista"]
+keywords = ["mcp", "clickhouse", "elasticsearch", "telemetry", "analytics", "percona", "vista"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -20,15 +20,16 @@ classifiers = [
 dependencies = [
     "mcp[cli]>=1.2.0",
     "clickhouse-connect>=0.8.0",
+    "elasticsearch>=8.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/Percona-Lab/clickhouse-mcp-server"
-Repository = "https://github.com/Percona-Lab/clickhouse-mcp-server"
-Issues = "https://github.com/Percona-Lab/clickhouse-mcp-server/issues"
+Homepage = "https://github.com/Percona-Lab/vista-data-mcp"
+Repository = "https://github.com/Percona-Lab/vista-data-mcp"
+Issues = "https://github.com/Percona-Lab/vista-data-mcp/issues"
 
 [project.scripts]
-clickhouse-mcp-server = "mcp_server:mcp.run"
+vista-data-mcp = "mcp_server:mcp.run"
 
 [build-system]
 requires = ["hatchling"]
