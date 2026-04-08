@@ -1,0 +1,38 @@
+[project]
+name = "clickhouse-mcp-server"
+version = "0.1.0"
+description = "Read-only ClickHouse MCP server for product telemetry and analytics. Part of Percona VISTA."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { name = "Percona Lab", email = "info@percona.com" },
+]
+keywords = ["mcp", "clickhouse", "telemetry", "analytics", "percona", "vista"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Database",
+]
+
+dependencies = [
+    "mcp[cli]>=1.2.0",
+    "clickhouse-connect>=0.8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Percona-Lab/clickhouse-mcp-server"
+Repository = "https://github.com/Percona-Lab/clickhouse-mcp-server"
+Issues = "https://github.com/Percona-Lab/clickhouse-mcp-server/issues"
+
+[project.scripts]
+clickhouse-mcp-server = "mcp_server:mcp.run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
