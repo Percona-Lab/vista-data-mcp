@@ -25,6 +25,28 @@ if Path(_dotenv_path).is_file():
 
 from mcp.server.fastmcp import FastMCP
 
+
+def _friendly_error(source: str, e: Exception) -> str:
+    """Return a user-friendly error message based on exception type."""
+    etype = type(e).__name__
+    msg = str(e)
+    if "ConnectionError" in etype or "ConnectionTimeout" in etype or "timed out" in msg.lower():
+        return (
+            f"**{source} connection failed.** Cannot reach the server. "
+            f"If you are running this locally, make sure you are connected to the Percona VPN "
+            f"and that your .env credentials are correct. "
+            f"If you are using the remote SHERPA server, make sure you are on VPN.\n\n"
+            f"_Technical detail: {etype}: {msg}_"
+        )
+    if "Authentication" in etype or "401" in msg or "403" in msg:
+        return (
+            f"**{source} authentication failed.** Your credentials may be incorrect or expired. "
+            f"Check the username and password in your .env file.\n\n"
+            f"_Technical detail: {etype}: {msg}_"
+        )
+    return f"**{source} query failed:** {etype}: {msg}"
+
+
 mcp = FastMCP(
     "vista-data",
     instructions=(
@@ -72,24 +94,24 @@ def query_clickhouse(sql: str) -> str:
         - SHOW TABLES
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST environment variable."
+        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _ch_instance().query(sql)
     except ValueError as e:
         return f"**Error:** {e}"
     except Exception as e:
-        return f"**Query failed:** {type(e).__name__}: {e}"
+        return _friendly_error("ClickHouse", e)
 
 
 @mcp.tool()
 def ch_list_databases() -> str:
     """List all databases accessible in the ClickHouse instance."""
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST environment variable."
+        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _ch_instance().list_databases()
     except Exception as e:
-        return f"**Error:** {type(e).__name__}: {e}"
+        return _friendly_error("ClickHouse", e)
 
 
 @mcp.tool()
@@ -100,11 +122,11 @@ def ch_list_tables(database: str | None = None) -> str:
         database: Database name. If omitted, lists tables in the default database.
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST environment variable."
+        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _ch_instance().list_tables(database)
     except Exception as e:
-        return f"**Error:** {type(e).__name__}: {e}"
+        return _friendly_error("ClickHouse", e)
 
 
 @mcp.tool()
@@ -116,11 +138,11 @@ def ch_describe_table(table: str, database: str | None = None) -> str:
         database: Database name. If omitted, uses the default database.
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST environment variable."
+        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _ch_instance().describe_table(table, database)
     except Exception as e:
-        return f"**Error:** {type(e).__name__}: {e}"
+        return _friendly_error("ClickHouse", e)
 
 
 @mcp.tool()
@@ -135,11 +157,11 @@ def ch_sample_data(table: str, database: str | None = None, limit: int = 10) -> 
         limit: Number of rows to return (1-100, default 10).
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST environment variable."
+        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _ch_instance().sample_data(table, database, limit)
     except Exception as e:
-        return f"**Error:** {type(e).__name__}: {e}"
+        return _friendly_error("ClickHouse", e)
 
 
 # ── Elasticsearch tools ──────────────────────────────────────────────
@@ -178,11 +200,11 @@ def search_elasticsearch(index: str, query_body: str, size: int | None = None) -
         - {"query": {"range": {"date": {"gte": "2025-01-01"}}}}
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST environment variable."
+        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _es_instance().search(index, query_body, size)
     except Exception as e:
-        return f"**Query failed:** {type(e).__name__}: {e}"
+        return _friendly_error("Elasticsearch", e)
 
 
 @mcp.tool()
@@ -192,11 +214,11 @@ def es_list_indices() -> str:
     Use this to discover available download/package data indices.
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST environment variable."
+        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _es_instance().list_indices()
     except Exception as e:
-        return f"**Error:** {type(e).__name__}: {e}"
+        return _friendly_error("Elasticsearch", e)
 
 
 @mcp.tool()
@@ -207,11 +229,11 @@ def es_get_mapping(index: str) -> str:
         index: The index name to inspect.
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST environment variable."
+        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _es_instance().get_mapping(index)
     except Exception as e:
-        return f"**Error:** {type(e).__name__}: {e}"
+        return _friendly_error("Elasticsearch", e)
 
 
 @mcp.tool()
@@ -225,11 +247,11 @@ def es_sample_data(index: str, size: int = 10) -> str:
         size: Number of documents to return (1-100, default 10).
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST environment variable."
+        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
     try:
         return _es_instance().sample_data(index, size)
     except Exception as e:
-        return f"**Error:** {type(e).__name__}: {e}"
+        return _friendly_error("Elasticsearch", e)
 
 
 # ── Entry point ──────────────────────────────────────────────────────
