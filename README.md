@@ -2,7 +2,15 @@
 
 Read-only MCP server for querying **ClickHouse** (product telemetry) and **Elasticsearch** (download analytics). Built for [Percona VISTA](https://github.com/Percona-Lab/VISTA).
 
-Both data sources are optional — configure one or both depending on what you have access to.
+## Do I need this?
+
+**Most users do not.** If you're on the Percona VPN, VISTA already connects to a shared remote server — no install, no credentials. Just add one line to your Claude settings:
+
+```json
+"vista-data": {"type": "sse", "url": "http://10.30.50.182:8400/sse"}
+```
+
+**This repo is for users who have their own ClickHouse or Elasticsearch credentials** and want to run the MCP server locally (e.g., for development, custom data sources, or offline use without VPN).
 
 ## Install (one command)
 
