@@ -50,10 +50,12 @@ def _friendly_error(source: str, e: Exception) -> str:
 
 
 _NOT_CONFIGURED_MSG = (
-    "**{source} not configured.** You can either:\n"
-    "1. **Use the shared server (recommended):** Connect to Percona VPN and add this to your Claude settings:\n"
-    '   `"vista-data": {{"type": "sse", "url": "http://10.30.50.182:8400/sse"}}`\n'
-    "2. **Run locally with credentials:** See https://github.com/Percona-Lab/vista-data-mcp"
+    "**{source} not configured.** Run the installer to set up the data connection:\n"
+    "```\n"
+    "uv run https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/installer.py\n"
+    "```\n"
+    "Choose Remote (default) for VPN access, or Local if you have your own credentials.\n"
+    "See https://github.com/Percona-Lab/vista-data-mcp for details."
 )
 
 mcp = FastMCP(
