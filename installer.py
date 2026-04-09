@@ -322,17 +322,12 @@ def build_mcp_entry_local(install_dir: Path, env_path: Path) -> dict:
     }
 
 
-def _find_uvx() -> str:
-    """Return the full path to uvx, or 'uvx' as fallback."""
-    import shutil
-    path = shutil.which("uvx")
-    return path if path else "uvx"
-
-
-def build_mcp_entry_remote() -> dict:
+def build_mcp_entry_remote(install_dir: Path) -> dict:
+    uv = resolve_uv_path()
     return {
-        "command": _find_uvx(),
-        "args": ["mcp-proxy", SHERPA_SSE_URL],
+        "command": uv,
+        "args": ["run", "--directory", str(install_dir), "mcp_server.py"],
+        "env": {"REMOTE_SSE_URL": SHERPA_SSE_URL},
     }
 
 
@@ -538,19 +533,24 @@ def main() -> None:
     mode = choose_mode()
 
     if mode == "remote":
-        # Remote mode — just configure the SSE URL, no local install needed
+        # Remote mode — install server locally but proxy to SHERPA on each call
         print(c(BOLD, "Setting up remote connection..."))
         print(f"  Server: {SHERPA_SSE_URL}")
         print(f"  {DIM}No credentials needed. VPN required when running queries.{NC}")
         print()
 
+        check_prerequisites()
+        install_dir, is_rerun = get_install_dir()
+        clone_or_pull(install_dir, is_rerun)
+        setup_python(install_dir)
+
         # Clean up any local .env credentials so only remote works
-        local_env = Path.home() / PROJECT_SLUG / ".env"
+        local_env = install_dir / ".env"
         if local_env.exists():
             info("Removing local credentials (.env) — remote mode uses the shared server.")
             local_env.unlink()
 
-        mcp_entry = build_mcp_entry_remote()
+        mcp_entry = build_mcp_entry_remote(install_dir)
         any_configured = configure_ai_clients(mcp_entry)
         install_vista_plugin()
         print_done(any_configured, {})

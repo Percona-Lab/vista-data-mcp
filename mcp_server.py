@@ -52,11 +52,54 @@ def _friendly_error(source: str, e: Exception) -> str:
 _NOT_CONFIGURED_MSG = (
     "**{source} not configured.** Run the installer to set up the data connection:\n"
     "```\n"
-    "uv run https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/installer.py\n"
+    "curl -fsSL https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/install-vista-data-mcp | bash\n"
     "```\n"
     "Choose Remote (default) for VPN access, or Local if you have your own credentials.\n"
     "See https://github.com/Percona-Lab/vista-data-mcp for details."
 )
+
+# ── Remote proxy mode ───────────────────────────────────────────────
+# When REMOTE_SSE_URL is set, tool calls are forwarded to a remote MCP
+# server via SSE. This lets the server start instantly (tools register)
+# even when off VPN — connection is attempted lazily per tool call.
+
+_REMOTE_SSE_URL = os.getenv("REMOTE_SSE_URL")
+
+_VPN_REQUIRED_MSG = (
+    "**Cannot reach the VISTA data server.** Connect to Percona VPN and try again.\n\n"
+    "The data MCP is configured in remote mode — it connects to a shared server "
+    "that is only accessible on the Percona internal network.\n\n"
+    "_If you need offline access, re-run the installer and choose Local mode "
+    "with your own credentials._"
+)
+
+
+async def _call_remote(tool_name: str, arguments: dict) -> str:
+    """Forward a tool call to the remote MCP server via SSE."""
+    from mcp.client.sse import sse_client
+    from mcp import ClientSession
+
+    try:
+        async with sse_client(url=_REMOTE_SSE_URL) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments)
+                if result.content:
+                    parts = [
+                        block.text for block in result.content
+                        if hasattr(block, "text")
+                    ]
+                    return "\n".join(parts) if parts else "No results."
+                return "No results returned."
+    except Exception as e:
+        msg = str(e).lower()
+        if any(k in msg for k in [
+            "nodename", "connecterror", "connect error",
+            "timed out", "connection refused", "unreachable",
+            "name or service not known", "no route to host",
+        ]):
+            return _VPN_REQUIRED_MSG
+        return f"**Remote query failed:** {type(e).__name__}: {e}"
 
 mcp = FastMCP(
     "vista-data",
@@ -87,7 +130,7 @@ def _ch_instance():
 
 
 @mcp.tool()
-def query_clickhouse(sql: str) -> str:
+async def query_clickhouse(sql: str) -> str:
     """Run a read-only SQL query against ClickHouse (telemetry data).
 
     Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed.
@@ -105,6 +148,8 @@ def query_clickhouse(sql: str) -> str:
         - SHOW TABLES
     """
     if not _ch_enabled():
+        if _REMOTE_SSE_URL:
+            return await _call_remote("query_clickhouse", {"sql": sql})
         return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().query(sql)
@@ -115,9 +160,11 @@ def query_clickhouse(sql: str) -> str:
 
 
 @mcp.tool()
-def ch_list_databases() -> str:
+async def ch_list_databases() -> str:
     """List all databases accessible in the ClickHouse instance."""
     if not _ch_enabled():
+        if _REMOTE_SSE_URL:
+            return await _call_remote("ch_list_databases", {})
         return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().list_databases()
@@ -126,13 +173,15 @@ def ch_list_databases() -> str:
 
 
 @mcp.tool()
-def ch_list_tables(database: str | None = None) -> str:
+async def ch_list_tables(database: str | None = None) -> str:
     """List all tables in a ClickHouse database.
 
     Args:
         database: Database name. If omitted, lists tables in the default database.
     """
     if not _ch_enabled():
+        if _REMOTE_SSE_URL:
+            return await _call_remote("ch_list_tables", {"database": database} if database else {})
         return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().list_tables(database)
@@ -141,7 +190,7 @@ def ch_list_tables(database: str | None = None) -> str:
 
 
 @mcp.tool()
-def ch_describe_table(table: str, database: str | None = None) -> str:
+async def ch_describe_table(table: str, database: str | None = None) -> str:
     """Show the schema (columns, types, comments) of a ClickHouse table.
 
     Args:
@@ -149,6 +198,11 @@ def ch_describe_table(table: str, database: str | None = None) -> str:
         database: Database name. If omitted, uses the default database.
     """
     if not _ch_enabled():
+        if _REMOTE_SSE_URL:
+            args = {"table": table}
+            if database:
+                args["database"] = database
+            return await _call_remote("ch_describe_table", args)
         return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().describe_table(table, database)
@@ -157,7 +211,7 @@ def ch_describe_table(table: str, database: str | None = None) -> str:
 
 
 @mcp.tool()
-def ch_sample_data(table: str, database: str | None = None, limit: int = 10) -> str:
+async def ch_sample_data(table: str, database: str | None = None, limit: int = 10) -> str:
     """Get sample rows from a ClickHouse table (up to 100 rows).
 
     Useful for understanding telemetry data structure before writing queries.
@@ -168,6 +222,11 @@ def ch_sample_data(table: str, database: str | None = None, limit: int = 10) -> 
         limit: Number of rows to return (1-100, default 10).
     """
     if not _ch_enabled():
+        if _REMOTE_SSE_URL:
+            args = {"table": table, "limit": limit}
+            if database:
+                args["database"] = database
+            return await _call_remote("ch_sample_data", args)
         return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().sample_data(table, database, limit)
@@ -193,7 +252,7 @@ def _es_instance():
 
 
 @mcp.tool()
-def search_elasticsearch(index: str, query_body: str, size: int | None = None) -> str:
+async def search_elasticsearch(index: str, query_body: str, size: int | None = None) -> str:
     """Run an Elasticsearch query (JSON DSL) against download/package data.
 
     Use this for product download data: downloads by product, package type,
@@ -211,6 +270,11 @@ def search_elasticsearch(index: str, query_body: str, size: int | None = None) -
         - {"query": {"range": {"date": {"gte": "2025-01-01"}}}}
     """
     if not _es_enabled():
+        if _REMOTE_SSE_URL:
+            args = {"index": index, "query_body": query_body}
+            if size is not None:
+                args["size"] = size
+            return await _call_remote("search_elasticsearch", args)
         return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().search(index, query_body, size)
@@ -219,12 +283,14 @@ def search_elasticsearch(index: str, query_body: str, size: int | None = None) -
 
 
 @mcp.tool()
-def es_list_indices() -> str:
+async def es_list_indices() -> str:
     """List all Elasticsearch indices with document counts and sizes.
 
     Use this to discover available download/package data indices.
     """
     if not _es_enabled():
+        if _REMOTE_SSE_URL:
+            return await _call_remote("es_list_indices", {})
         return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().list_indices()
@@ -233,13 +299,15 @@ def es_list_indices() -> str:
 
 
 @mcp.tool()
-def es_get_mapping(index: str) -> str:
+async def es_get_mapping(index: str) -> str:
     """Show the field mapping (schema) for an Elasticsearch index.
 
     Args:
         index: The index name to inspect.
     """
     if not _es_enabled():
+        if _REMOTE_SSE_URL:
+            return await _call_remote("es_get_mapping", {"index": index})
         return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().get_mapping(index)
@@ -248,7 +316,7 @@ def es_get_mapping(index: str) -> str:
 
 
 @mcp.tool()
-def es_sample_data(index: str, size: int = 10) -> str:
+async def es_sample_data(index: str, size: int = 10) -> str:
     """Get sample documents from an Elasticsearch index (up to 100).
 
     Useful for understanding download data structure before writing queries.
@@ -258,6 +326,8 @@ def es_sample_data(index: str, size: int = 10) -> str:
         size: Number of documents to return (1-100, default 10).
     """
     if not _es_enabled():
+        if _REMOTE_SSE_URL:
+            return await _call_remote("es_sample_data", {"index": index, "size": size})
         return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().sample_data(index, size)
