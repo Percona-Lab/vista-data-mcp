@@ -37,7 +37,7 @@ REPO_URL = "https://github.com/Percona-Lab/vista-data-mcp.git"
 PROJECT_SLUG = "vista-data-mcp"
 PROJECT_NAME = "VISTA Data MCP"
 MCP_SERVER_NAME = "vista-data"
-SHERPA_SSE_URL = "http://sherpa.int.percona.com:8400/sse"
+SHERPA_SSE_URL = "http://sherpa.tp.int.percona.com:8400/sse"
 
 # ---------------------------------------------------------------------------
 # Helpers
