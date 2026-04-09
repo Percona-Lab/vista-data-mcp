@@ -2,30 +2,24 @@
 
 Read-only MCP server for querying **ClickHouse** (product telemetry) and **Elasticsearch** (download analytics). Built for [Percona VISTA](https://github.com/Percona-Lab/VISTA).
 
-## Do I need this?
-
-**Most users do not need to clone this repo.** If you're on the Percona VPN, just run the installer and choose Remote (default) — no credentials needed:
+## Install
 
 ```bash
 uv run https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/installer.py
 ```
 
-**The local install option is for users who have their own ClickHouse or Elasticsearch credentials** and want to run the MCP server locally (e.g., for development, custom data sources, or offline use without VPN).
-
-## Install (one command)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/install-vista-data-mcp | bash
-```
-
 The installer will:
-1. Install `uv` if needed
-2. Clone this repo to `~/vista-data-mcp`
-3. Prompt for your ClickHouse and/or Elasticsearch credentials
-4. Auto-detect and configure Claude Desktop, Claude Code, and CLI
-5. Persist across reboots — the MCP config points to the cloned repo on disk
+1. Ask you to choose **Remote** (default) or **Local** mode
+2. Configure Claude Desktop and Claude Code automatically
+3. Install the VISTA plugin
 
-Re-run the same command to update or change credentials.
+**Remote mode** — connects to the shared Percona server over VPN. No credentials, no clone, no local install. Most users choose this.
+
+**Local mode** — for users with their own ClickHouse or Elasticsearch credentials who want to run off-VPN (development, custom data sources).
+
+Re-run the same command to update or change mode.
+
+> **Prerequisite:** [uv](https://docs.astral.sh/uv/getting-started/installation/) must be installed. If you don't have it: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ---
 
@@ -74,37 +68,6 @@ claude mcp add vista-data \
   -e ES_PASSWORD=your-es-password \
   -e ES_SECURE=true \
   -- uvx --from git+https://github.com/Percona-Lab/vista-data-mcp vista-data-mcp
-```
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "vista-data": {
-      "command": "uvx",
-      "args": [
-        "--from", "git+https://github.com/Percona-Lab/vista-data-mcp",
-        "vista-data-mcp"
-      ],
-      "env": {
-        "CLICKHOUSE_HOST": "your-ch-host",
-        "CLICKHOUSE_PORT": "8443",
-        "CLICKHOUSE_USER": "default",
-        "CLICKHOUSE_PASSWORD": "your-ch-password",
-        "CLICKHOUSE_DATABASE": "default",
-        "CLICKHOUSE_SECURE": "true",
-        "ES_HOST": "your-es-host",
-        "ES_PORT": "9200",
-        "ES_USER": "your-es-user",
-        "ES_PASSWORD": "your-es-password",
-        "ES_SECURE": "true"
-      }
-    }
-  }
-}
 ```
 
 ### Development
