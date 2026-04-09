@@ -5,21 +5,20 @@ Read-only MCP server for querying **ClickHouse** (product telemetry) and **Elast
 ## Install
 
 ```bash
-uv run https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/installer.py
+curl -fsSL https://raw.githubusercontent.com/Percona-Lab/vista-data-mcp/main/install-vista-data-mcp | bash
 ```
 
 The installer will:
-1. Ask you to choose **Remote** (default) or **Local** mode
-2. Configure Claude Desktop and Claude Code automatically
-3. Install the VISTA plugin
+1. Install `uv` if needed
+2. Ask you to choose **Remote** (default) or **Local** mode
+3. Configure Claude Desktop and Claude Code automatically
+4. Install the VISTA plugin
 
 **Remote mode** — connects to the shared Percona server over VPN. No credentials, no clone, no local install. Most users choose this.
 
 **Local mode** — for users with their own ClickHouse or Elasticsearch credentials who want to run off-VPN (development, custom data sources).
 
 Re-run the same command to update or change mode.
-
-> **Prerequisite:** [uv](https://docs.astral.sh/uv/getting-started/installation/) must be installed. If you don't have it: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ---
 
