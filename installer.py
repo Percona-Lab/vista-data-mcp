@@ -324,8 +324,8 @@ def build_mcp_entry_local(install_dir: Path, env_path: Path) -> dict:
 
 def build_mcp_entry_remote() -> dict:
     return {
-        "type": "sse",
-        "url": SHERPA_SSE_URL,
+        "command": "uvx",
+        "args": ["mcp-proxy", SHERPA_SSE_URL],
     }
 
 
