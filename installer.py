@@ -385,7 +385,84 @@ def configure_ai_clients(mcp_entry: dict) -> bool:
     return any_configured
 
 # ---------------------------------------------------------------------------
-# Step 8: Done
+# Step 8: Install VISTA plugin
+# ---------------------------------------------------------------------------
+
+VISTA_PLUGIN_REPO = "https://github.com/Percona-Lab/VISTA"
+VISTA_PLUGIN_ZIP_URL = f"{VISTA_PLUGIN_REPO}/releases/latest/download/vista-plugin.zip"
+
+
+def get_claude_plugins_dir() -> Path | None:
+    """Return the Claude Desktop plugins upload directory."""
+    system = platform.system()
+    if system == "Darwin":
+        base = Path.home() / "Library" / "Application Support" / "Claude"
+    elif system == "Linux":
+        base = Path.home() / ".config" / "Claude"
+    elif system == "Windows":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            base = Path(appdata) / "Claude"
+        else:
+            return None
+    else:
+        return None
+
+    # Find the cowork_plugins upload directory
+    sessions_dir = base / "local-agent-mode-sessions"
+    if not sessions_dir.exists():
+        return None
+
+    # Walk to find cowork_plugins/cache/local-desktop-app-uploads
+    for session in sessions_dir.iterdir():
+        for sub in session.iterdir():
+            uploads = sub / "cowork_plugins" / "cache" / "local-desktop-app-uploads"
+            if uploads.exists():
+                return uploads
+    return None
+
+
+def install_vista_plugin() -> bool:
+    """Download and install the VISTA plugin for Claude Desktop."""
+    print(c(BOLD, "Installing VISTA plugin..."))
+
+    plugins_dir = get_claude_plugins_dir()
+    if plugins_dir is None:
+        print(f"  {DIM}Claude Desktop plugin directory not found.{NC}")
+        print(f"  {DIM}Install VISTA manually: {VISTA_PLUGIN_REPO}{NC}")
+        return False
+
+    vista_dir = plugins_dir / "vista" / "1.2.0"
+    if vista_dir.exists():
+        info("VISTA plugin already installed.")
+        return True
+
+    import tempfile
+    import zipfile
+    import urllib.request
+
+    try:
+        info(f"Downloading from {VISTA_PLUGIN_REPO}/releases/latest ...")
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            urllib.request.urlretrieve(VISTA_PLUGIN_ZIP_URL, tmp.name)
+            tmp_path = tmp.name
+
+        vista_dir.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(tmp_path, "r") as zf:
+            zf.extractall(vista_dir)
+        os.unlink(tmp_path)
+
+        info("VISTA plugin installed!")
+        print(f"  {DIM}For auto-updates, replace with the org marketplace version later.{NC}")
+        return True
+    except Exception as e:
+        warn(f"Could not install VISTA plugin: {e}")
+        print(f"  {DIM}Install manually: {VISTA_PLUGIN_REPO}{NC}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Step 9: Done
 # ---------------------------------------------------------------------------
 
 def print_done(any_clients_configured: bool, env: dict) -> None:
@@ -462,6 +539,7 @@ def main() -> None:
 
         mcp_entry = build_mcp_entry_remote()
         any_configured = configure_ai_clients(mcp_entry)
+        install_vista_plugin()
         print_done(any_configured, {})
 
     else:
@@ -482,6 +560,7 @@ def main() -> None:
 
         mcp_entry = build_mcp_entry_local(install_dir, env_path)
         any_configured = configure_ai_clients(mcp_entry)
+        install_vista_plugin()
         print_done(any_configured, env)
 
 
