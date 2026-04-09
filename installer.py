@@ -537,6 +537,12 @@ def main() -> None:
         print(f"  {DIM}No credentials needed. VPN required when running queries.{NC}")
         print()
 
+        # Clean up any local .env credentials so only remote works
+        local_env = Path.home() / PROJECT_SLUG / ".env"
+        if local_env.exists():
+            info("Removing local credentials (.env) — remote mode uses the shared server.")
+            local_env.unlink()
+
         mcp_entry = build_mcp_entry_remote()
         any_configured = configure_ai_clients(mcp_entry)
         install_vista_plugin()
