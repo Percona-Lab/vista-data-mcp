@@ -32,16 +32,18 @@ def _friendly_error(source: str, e: Exception) -> str:
     msg = str(e)
     if "ConnectionError" in etype or "ConnectionTimeout" in etype or "timed out" in msg.lower():
         return (
-            f"**{source} connection failed.** Cannot reach the server. "
-            f"If you are running this locally, make sure you are connected to the Percona VPN "
-            f"and that your .env credentials are correct. "
-            f"If you are using the remote SHERPA server, make sure you are on VPN.\n\n"
+            f"**{source} connection failed.** Cannot reach the server.\n\n"
+            f"**If using the remote server (recommended setup):** Connect to Percona VPN and try again.\n"
+            f"**If running locally with your own credentials:** Check that the host in your .env file is correct "
+            f"and reachable from your network.\n\n"
             f"_Technical detail: {etype}: {msg}_"
         )
     if "Authentication" in etype or "401" in msg or "403" in msg:
         return (
-            f"**{source} authentication failed.** Your credentials may be incorrect or expired. "
-            f"Check the username and password in your .env file.\n\n"
+            f"**{source} authentication failed.** Your credentials are incorrect or expired. "
+            f"Check the username and password in your .env file. "
+            f"If you don't have credentials, switch to the remote server instead — "
+            f"no credentials needed, just VPN. See https://github.com/Percona-Lab/vista-data-mcp\n\n"
             f"_Technical detail: {etype}: {msg}_"
         )
     return f"**{source} query failed:** {etype}: {msg}"
