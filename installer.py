@@ -116,9 +116,10 @@ def print_banner() -> None:
     print(f"  and Elasticsearch (downloads) for VISTA reports.")
     print()
     print(f"  {BOLD}Two modes:{NC}")
-    print(f"    1. {GREEN}Remote (recommended){NC} — connect to the shared SHERPA server via VPN")
-    print(f"       No credentials needed. Just VPN.")
+    print(f"    1. {GREEN}Remote (recommended){NC} — connect to the shared Percona server")
+    print(f"       No credentials needed. No local install. Just requires VPN when querying.")
     print(f"    2. {YELLOW}Local{NC} — run the MCP server on your machine with your own credentials")
+    print(f"       No VPN needed, but you must have CH/ES credentials.")
     print()
 
 # ---------------------------------------------------------------------------
@@ -399,8 +400,8 @@ def print_done(any_clients_configured: bool, env: dict) -> None:
 
     if not env:
         # Remote mode
-        print(f"  {BOLD}Mode: Remote (SHERPA server){NC}")
-        print(f"  Connect to Percona VPN, then try these prompts:")
+        print(f"  {BOLD}Mode: Remote{NC}")
+        print(f"  Connect to Percona VPN when querying, then try these prompts:")
         print()
         print(f"    /vista How many active instances of each product do we have?")
         print(f"    /vista Show me downloaded postgres packages by package type for last month")
@@ -439,8 +440,8 @@ def print_done(any_clients_configured: bool, env: dict) -> None:
 def choose_mode() -> str:
     """Ask user to choose remote (SHERPA) or local mode."""
     print(c(BOLD, "Connection mode"))
-    print(f"  {GREEN}1) Remote (SHERPA server){NC} — recommended, no credentials needed, requires VPN")
-    print(f"  {YELLOW}2) Local{NC} — run MCP server on your machine with your own credentials")
+    print(f"  {GREEN}1) Remote (recommended){NC} — no credentials, no local install. Requires VPN when querying.")
+    print(f"  {YELLOW}2) Local{NC} — run MCP server on your machine with your own CH/ES credentials. No VPN needed.")
     print()
     choice = ask("Choose mode", "1")
     print()
@@ -454,9 +455,9 @@ def main() -> None:
 
     if mode == "remote":
         # Remote mode — just configure the SSE URL, no local install needed
-        print(c(BOLD, "Setting up remote connection to SHERPA..."))
+        print(c(BOLD, "Setting up remote connection..."))
         print(f"  Server: {SHERPA_SSE_URL}")
-        print(f"  {DIM}Requires Percona VPN connection.{NC}")
+        print(f"  {DIM}No credentials needed. VPN required when running queries.{NC}")
         print()
 
         mcp_entry = build_mcp_entry_remote()
