@@ -417,11 +417,37 @@ def get_claude_plugins_dir() -> Path | None:
 
     # Walk to find cowork_plugins/cache/local-desktop-app-uploads
     for session in sessions_dir.iterdir():
+        if not session.is_dir():
+            continue
         for sub in session.iterdir():
+            if not sub.is_dir():
+                continue
             uploads = sub / "cowork_plugins" / "cache" / "local-desktop-app-uploads"
             if uploads.exists():
                 return uploads
     return None
+
+
+def _get_plugin_version() -> str:
+    """Read the VISTA plugin version from the latest release zip's plugin.json."""
+    import tempfile
+    import zipfile
+    import urllib.request
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            urllib.request.urlretrieve(VISTA_PLUGIN_ZIP_URL, tmp.name)
+            tmp_path = tmp.name
+        with zipfile.ZipFile(tmp_path, "r") as zf:
+            for name in zf.namelist():
+                if name.endswith("plugin.json"):
+                    data = json.loads(zf.read(name))
+                    os.unlink(tmp_path)
+                    return data.get("version", "latest")
+        os.unlink(tmp_path)
+    except Exception:
+        pass
+    return "latest"
 
 
 def install_vista_plugin() -> bool:
@@ -431,11 +457,13 @@ def install_vista_plugin() -> bool:
     plugins_dir = get_claude_plugins_dir()
     if plugins_dir is None:
         print(f"  {DIM}Claude Desktop plugin directory not found.{NC}")
-        print(f"  {DIM}Install VISTA manually: {VISTA_PLUGIN_REPO}{NC}")
+        print(f"  {DIM}This is normal on first launch — open Cowork once, then re-run.{NC}")
+        print(f"  {DIM}Or install VISTA from the marketplace: Percona-Lab/claude-plugins{NC}")
         return False
 
-    vista_dir = plugins_dir / "vista" / "1.2.0"
-    if vista_dir.exists():
+    # Check if any version is already installed
+    vista_base = plugins_dir / "vista"
+    if vista_base.exists() and any(vista_base.iterdir()):
         info("VISTA plugin already installed.")
         return True
 
@@ -449,17 +477,27 @@ def install_vista_plugin() -> bool:
             urllib.request.urlretrieve(VISTA_PLUGIN_ZIP_URL, tmp.name)
             tmp_path = tmp.name
 
+        # Read version from the downloaded zip
+        version = "latest"
+        with zipfile.ZipFile(tmp_path, "r") as zf:
+            for name in zf.namelist():
+                if name.endswith("plugin.json"):
+                    data = json.loads(zf.read(name))
+                    version = data.get("version", "latest")
+                    break
+
+        vista_dir = plugins_dir / "vista" / version
         vista_dir.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(tmp_path, "r") as zf:
             zf.extractall(vista_dir)
         os.unlink(tmp_path)
 
-        info("VISTA plugin installed!")
-        print(f"  {DIM}For auto-updates, replace with the org marketplace version later.{NC}")
+        info(f"VISTA plugin v{version} installed!")
+        print(f"  {DIM}For auto-updates, add the marketplace instead: Percona-Lab/claude-plugins{NC}")
         return True
     except Exception as e:
         warn(f"Could not install VISTA plugin: {e}")
-        print(f"  {DIM}Install manually: {VISTA_PLUGIN_REPO}{NC}")
+        print(f"  {DIM}Install from marketplace instead: Percona-Lab/claude-plugins{NC}")
         return False
 
 
