@@ -37,6 +37,7 @@ REPO_URL = "https://github.com/Percona-Lab/vista-data-mcp.git"
 PROJECT_SLUG = "vista-data-mcp"
 PROJECT_NAME = "VISTA Data MCP"
 MCP_SERVER_NAME = "vista-data"
+SHERPA_SSE_URL = "http://10.30.50.182:8400/sse"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -111,9 +112,13 @@ def print_banner() -> None:
     print(c(BOLD, " ClickHouse + Elasticsearch for Percona VISTA"))
     print(c(BOLD, "=" * 60))
     print()
-    print(f"  This installs a read-only MCP server that gives Claude")
-    print(f"  access to ClickHouse (telemetry) and Elasticsearch (downloads).")
-    print(f"  Both data sources are optional — configure one or both.")
+    print(f"  This gives Claude read-only access to ClickHouse (telemetry)")
+    print(f"  and Elasticsearch (downloads) for VISTA reports.")
+    print()
+    print(f"  {BOLD}Two modes:{NC}")
+    print(f"    1. {GREEN}Remote (recommended){NC} — connect to the shared SHERPA server via VPN")
+    print(f"       No credentials needed. Just VPN.")
+    print(f"    2. {YELLOW}Local{NC} — run the MCP server on your machine with your own credentials")
     print()
 
 # ---------------------------------------------------------------------------
@@ -307,7 +312,7 @@ def resolve_uv_path() -> str:
     return "uv"  # last resort, hope it's on PATH
 
 
-def build_mcp_entry(install_dir: Path, env_path: Path) -> dict:
+def build_mcp_entry_local(install_dir: Path, env_path: Path) -> dict:
     uv = resolve_uv_path()
     return {
         "command": uv,
@@ -316,7 +321,14 @@ def build_mcp_entry(install_dir: Path, env_path: Path) -> dict:
     }
 
 
-def configure_json_file(config_path: Path, install_dir: Path, env_path: Path, label: str) -> bool:
+def build_mcp_entry_remote() -> dict:
+    return {
+        "type": "sse",
+        "url": SHERPA_SSE_URL,
+    }
+
+
+def configure_json_file(config_path: Path, mcp_entry: dict, label: str) -> bool:
     if not config_path.parent.exists():
         if not ask_yn(f"{label} config dir not found at {config_path.parent}.\n  Configure anyway?", default=False):
             return False
@@ -332,14 +344,14 @@ def configure_json_file(config_path: Path, install_dir: Path, env_path: Path, la
                 return False
 
     config.setdefault("mcpServers", {})
-    config["mcpServers"][MCP_SERVER_NAME] = build_mcp_entry(install_dir, env_path)
+    config["mcpServers"][MCP_SERVER_NAME] = mcp_entry
 
     config_path.write_text(json.dumps(config, indent=2) + "\n")
     info(f"Configured {label}: {config_path}")
     return True
 
 
-def configure_ai_clients(install_dir: Path, env_path: Path) -> bool:
+def configure_ai_clients(mcp_entry: dict) -> bool:
     print(c(BOLD, "Configuring AI clients..."))
     any_configured = False
 
@@ -348,24 +360,24 @@ def configure_ai_clients(install_dir: Path, env_path: Path) -> bool:
     if desktop_path is not None:
         if desktop_path.parent.exists():
             info("Claude Desktop detected — auto-configuring...")
-            if configure_json_file(desktop_path, install_dir, env_path, "Claude Desktop"):
+            if configure_json_file(desktop_path, mcp_entry, "Claude Desktop"):
                 any_configured = True
         else:
             print(f"  {DIM}Claude Desktop not detected ({desktop_path.parent}){NC}")
             if ask_yn("Configure Claude Desktop MCP anyway?", default=False):
-                if configure_json_file(desktop_path, install_dir, env_path, "Claude Desktop"):
+                if configure_json_file(desktop_path, mcp_entry, "Claude Desktop"):
                     any_configured = True
 
     # Claude Code — settings.json
     code_settings_path = Path.home() / ".claude" / "settings.json"
     if code_settings_path.parent.exists():
         info("Claude Code detected — auto-configuring settings.json...")
-        if configure_json_file(code_settings_path, install_dir, env_path, "Claude Code"):
+        if configure_json_file(code_settings_path, mcp_entry, "Claude Code"):
             any_configured = True
     else:
         print(f"  {DIM}Claude Code not detected ({code_settings_path.parent}){NC}")
         if ask_yn("Configure Claude Code MCP anyway?", default=False):
-            if configure_json_file(code_settings_path, install_dir, env_path, "Claude Code"):
+            if configure_json_file(code_settings_path, mcp_entry, "Claude Code"):
                 any_configured = True
 
     print()
@@ -385,28 +397,38 @@ def print_done(any_clients_configured: bool, env: dict) -> None:
         print(f"  {YELLOW}Restart Claude Desktop / Claude Code for changes to take effect.{NC}")
         print()
 
-    sources = []
-    if "CLICKHOUSE_HOST" in env:
-        sources.append("ClickHouse")
-    if "ES_HOST" in env:
-        sources.append("Elasticsearch")
-
-    if sources:
-        print(f"  Configured data sources: {', '.join(sources)}")
+    if not env:
+        # Remote mode
+        print(f"  {BOLD}Mode: Remote (SHERPA server){NC}")
+        print(f"  Connect to Percona VPN, then try these prompts:")
         print()
-        print(f"  {BOLD}Try these prompts after restarting:{NC}")
-        if "ES_HOST" in env:
-            print(f"    /vista Show me downloaded postgres packages by package type for last month")
-        if "CLICKHOUSE_HOST" in env:
-            print(f"    /vista How many active PS 8.4 instances are there?")
-            print(f"    /vista What's the version distribution for PXC?")
+        print(f"    /vista How many active instances of each product do we have?")
+        print(f"    /vista Show me downloaded postgres packages by package type for last month")
+        print(f"    /vista How is PSMDB adoption trending month over month?")
         print()
+        print(f"  {DIM}To switch to local mode with your own credentials, re-run this installer.{NC}")
     else:
-        print(f"  No data sources configured yet.")
-        print(f"  Re-run this installer to add ClickHouse or Elasticsearch credentials.")
-        print()
+        sources = []
+        if "CLICKHOUSE_HOST" in env:
+            sources.append("ClickHouse")
+        if "ES_HOST" in env:
+            sources.append("Elasticsearch")
 
-    print(f"  To update later: re-run this installer from the same directory.")
+        if sources:
+            print(f"  {BOLD}Mode: Local{NC} — configured: {', '.join(sources)}")
+            print()
+            print(f"  {BOLD}Try these prompts after restarting:{NC}")
+            if "ES_HOST" in env:
+                print(f"    /vista Show me downloaded postgres packages by package type for last month")
+            if "CLICKHOUSE_HOST" in env:
+                print(f"    /vista How many active PS 8.4 instances are there?")
+                print(f"    /vista What's the version distribution for PXC?")
+            print()
+        else:
+            print(f"  No data sources configured yet.")
+            print(f"  Re-run this installer to add credentials or switch to remote mode.")
+            print()
+
     print(f"  Repo: https://github.com/Percona-Lab/vista-data-mcp")
     print()
 
@@ -414,23 +436,52 @@ def print_done(any_clients_configured: bool, env: dict) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+def choose_mode() -> str:
+    """Ask user to choose remote (SHERPA) or local mode."""
+    print(c(BOLD, "Connection mode"))
+    print(f"  {GREEN}1) Remote (SHERPA server){NC} — recommended, no credentials needed, requires VPN")
+    print(f"  {YELLOW}2) Local{NC} — run MCP server on your machine with your own credentials")
+    print()
+    choice = ask("Choose mode", "1")
+    print()
+    return "remote" if choice != "2" else "local"
+
+
 def main() -> None:
     print_banner()
-    check_prerequisites()
 
-    install_dir, is_rerun = get_install_dir()
-    clone_or_pull(install_dir, is_rerun)
-    setup_python(install_dir)
+    mode = choose_mode()
 
-    env = collect_credentials()
-    if env:
-        env_path = write_env_file(install_dir, env)
+    if mode == "remote":
+        # Remote mode — just configure the SSE URL, no local install needed
+        print(c(BOLD, "Setting up remote connection to SHERPA..."))
+        print(f"  Server: {SHERPA_SSE_URL}")
+        print(f"  {DIM}Requires Percona VPN connection.{NC}")
+        print()
+
+        mcp_entry = build_mcp_entry_remote()
+        any_configured = configure_ai_clients(mcp_entry)
+        print_done(any_configured, {})
+
     else:
-        env_path = install_dir / ".env"
-        if not env_path.exists():
-            env_path.write_text("# Add credentials here and re-run the installer\n")
-    any_configured = configure_ai_clients(install_dir, env_path)
-    print_done(any_configured, env)
+        # Local mode — full install with credentials
+        check_prerequisites()
+
+        install_dir, is_rerun = get_install_dir()
+        clone_or_pull(install_dir, is_rerun)
+        setup_python(install_dir)
+
+        env = collect_credentials()
+        if env:
+            env_path = write_env_file(install_dir, env)
+        else:
+            env_path = install_dir / ".env"
+            if not env_path.exists():
+                env_path.write_text("# Add credentials here and re-run the installer\n")
+
+        mcp_entry = build_mcp_entry_local(install_dir, env_path)
+        any_configured = configure_ai_clients(mcp_entry)
+        print_done(any_configured, env)
 
 
 if __name__ == "__main__":

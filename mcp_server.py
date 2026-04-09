@@ -47,6 +47,13 @@ def _friendly_error(source: str, e: Exception) -> str:
     return f"**{source} query failed:** {etype}: {msg}"
 
 
+_NOT_CONFIGURED_MSG = (
+    "**{source} not configured.** You can either:\n"
+    "1. **Use the shared server (recommended):** Connect to Percona VPN and add this to your Claude settings:\n"
+    '   `"vista-data": {{"type": "sse", "url": "http://10.30.50.182:8400/sse"}}`\n'
+    "2. **Run locally with credentials:** See https://github.com/Percona-Lab/vista-data-mcp"
+)
+
 mcp = FastMCP(
     "vista-data",
     instructions=(
@@ -94,7 +101,7 @@ def query_clickhouse(sql: str) -> str:
         - SHOW TABLES
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().query(sql)
     except ValueError as e:
@@ -107,7 +114,7 @@ def query_clickhouse(sql: str) -> str:
 def ch_list_databases() -> str:
     """List all databases accessible in the ClickHouse instance."""
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().list_databases()
     except Exception as e:
@@ -122,7 +129,7 @@ def ch_list_tables(database: str | None = None) -> str:
         database: Database name. If omitted, lists tables in the default database.
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().list_tables(database)
     except Exception as e:
@@ -138,7 +145,7 @@ def ch_describe_table(table: str, database: str | None = None) -> str:
         database: Database name. If omitted, uses the default database.
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().describe_table(table, database)
     except Exception as e:
@@ -157,7 +164,7 @@ def ch_sample_data(table: str, database: str | None = None, limit: int = 10) -> 
         limit: Number of rows to return (1-100, default 10).
     """
     if not _ch_enabled():
-        return "**ClickHouse not configured.** Set CLICKHOUSE_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="ClickHouse")
     try:
         return _ch_instance().sample_data(table, database, limit)
     except Exception as e:
@@ -200,7 +207,7 @@ def search_elasticsearch(index: str, query_body: str, size: int | None = None) -
         - {"query": {"range": {"date": {"gte": "2025-01-01"}}}}
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().search(index, query_body, size)
     except Exception as e:
@@ -214,7 +221,7 @@ def es_list_indices() -> str:
     Use this to discover available download/package data indices.
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().list_indices()
     except Exception as e:
@@ -229,7 +236,7 @@ def es_get_mapping(index: str) -> str:
         index: The index name to inspect.
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().get_mapping(index)
     except Exception as e:
@@ -247,7 +254,7 @@ def es_sample_data(index: str, size: int = 10) -> str:
         size: Number of documents to return (1-100, default 10).
     """
     if not _es_enabled():
-        return "**Elasticsearch not configured.** Set ES_HOST in your .env file. See https://github.com/Percona-Lab/vista-data-mcp for setup instructions."
+        return _NOT_CONFIGURED_MSG.format(source="Elasticsearch")
     try:
         return _es_instance().sample_data(index, size)
     except Exception as e:
