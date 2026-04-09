@@ -322,9 +322,16 @@ def build_mcp_entry_local(install_dir: Path, env_path: Path) -> dict:
     }
 
 
+def _find_uvx() -> str:
+    """Return the full path to uvx, or 'uvx' as fallback."""
+    import shutil
+    path = shutil.which("uvx")
+    return path if path else "uvx"
+
+
 def build_mcp_entry_remote() -> dict:
     return {
-        "command": "uvx",
+        "command": _find_uvx(),
         "args": ["mcp-proxy", SHERPA_SSE_URL],
     }
 
