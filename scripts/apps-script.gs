@@ -70,8 +70,13 @@ function _writeDaily(ss, body) {
     sh.getRange(1, 1, 1, header.length).setFontWeight("bold");
   }
 
-  // Find existing row for this date; else append.
-  const dates = sh.getRange(2, 1, Math.max(0, sh.getLastRow() - 1), 1).getValues().map(r => r[0]);
+  // Find existing row for this date; else append. Guard against empty sheet
+  // (only the header row): getRange requires numRows >= 1, so we must skip the
+  // lookup entirely when there are no data rows yet.
+  const lastRow = sh.getLastRow();
+  const dates = lastRow >= 2
+    ? sh.getRange(2, 1, lastRow - 1, 1).getValues().map(r => r[0])
+    : [];
   const existing = dates.findIndex(d =>
     (d instanceof Date ? Utilities.formatDate(d, "UTC", "yyyy-MM-dd") : String(d)) === body.date
   );
