@@ -116,6 +116,18 @@ must have passwordless sudo configured for `journalctl` for the running user
 (matches percona-dk). If sudo prompts for a password the script silently exits
 0; the report won't post.
 
+## System vs user systemd unit
+
+On SHERPA, `vista-data-mcp.service` is a **system-level** unit (lives in
+`/etc/systemd/system/`, runs as user `dennis.kittrell`). The report script
+reads logs via `_SYSTEMD_UNIT=...` (system) — NOT `_SYSTEMD_USER_UNIT=...`
+(which is what `percona-dk-usage-report.sh` uses, because percona-dk's MCP
+runs as a `--user` service).
+
+The aggregation timer itself (`vista-data-usage-report.timer`) is installed as
+a user-level unit at `~/.config/systemd/user/` so it can run as the user
+without root, calling `sudo` only for the journal read.
+
 ## Backfill
 
 The MCP server starts emitting log lines as soon as the new code is deployed.

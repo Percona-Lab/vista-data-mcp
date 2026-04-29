@@ -28,10 +28,13 @@ DATE="${1:-$(date -u -d 'yesterday' '+%Y-%m-%d')}"
 SINCE="${DATE} 00:00:00 UTC"
 UNTIL="${DATE} 23:59:59 UTC"
 
-# The MCP service runs as a systemd --user service; its stdout/stderr end up
-# in the system journal, which non-root users cannot read without sudo.
-# Passwordless sudo for journalctl is configured (matches percona-dk pattern).
-LINES=$(sudo -n journalctl _SYSTEMD_USER_UNIT=vista-data-mcp.service \
+# vista-data-mcp.service is a system-level systemd unit on SHERPA (running as
+# user dennis.kittrell, but managed via /etc/systemd/system, NOT --user). Its
+# stdout/stderr land in the system journal, which non-root users cannot read
+# without sudo. Passwordless sudo for journalctl is configured (matches the
+# percona-dk pattern). Note: percona-dk uses _SYSTEMD_USER_UNIT because that
+# service IS user-managed; this one is not — keep them straight.
+LINES=$(sudo -n journalctl _SYSTEMD_UNIT=vista-data-mcp.service \
     --since "$SINCE" --until "$UNTIL" --no-pager 2>/dev/null \
     | grep "Vista MCP " || true)
 
