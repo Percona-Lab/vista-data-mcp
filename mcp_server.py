@@ -8,8 +8,37 @@ https://github.com/Percona-Lab/VISTA
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 from pathlib import Path
+
+# ── Usage analytics logging ──────────────────────────────────────────
+# Every tool invocation emits one log line in the format:
+#   Vista MCP <tool>: <json args>
+# captured by systemd → journalctl on the SHERPA host. A daily timer runs
+# scripts/report-vista-usage.sh, parses these lines, aggregates total /
+# peak hour / distinct queries / top queries, and POSTs the summary to a
+# Google Apps Script webhook → Google Sheet (tracking dashboard).
+#
+# Local-mode users (running their own CH/ES) also emit these lines into
+# their local journalctl; only the SHERPA-deployed instance ships them
+# upstream via the daily report script.
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+log = logging.getLogger("vista_mcp")
+
+
+def _log_tool(tool: str, **args) -> None:
+    """Emit a structured log line for a tool invocation."""
+    try:
+        argjson = json.dumps(args, default=str, ensure_ascii=False)
+    except Exception:
+        argjson = repr(args)
+    log.info("Vista MCP %s: %s", tool, argjson)
 
 # Load credentials from .env file if DOTENV_PATH is set or .env exists next to this script
 _dotenv_path = os.getenv("DOTENV_PATH") or str(Path(__file__).parent / ".env")
@@ -147,6 +176,7 @@ async def query_clickhouse(sql: str) -> str:
         - SELECT version, count() as n FROM telemetry GROUP BY version ORDER BY n DESC
         - SHOW TABLES
     """
+    _log_tool("query_clickhouse", sql=sql)
     if not _ch_enabled():
         if _REMOTE_SSE_URL:
             return await _call_remote("query_clickhouse", {"sql": sql})
@@ -162,6 +192,7 @@ async def query_clickhouse(sql: str) -> str:
 @mcp.tool()
 async def ch_list_databases() -> str:
     """List all databases accessible in the ClickHouse instance."""
+    _log_tool("ch_list_databases")
     if not _ch_enabled():
         if _REMOTE_SSE_URL:
             return await _call_remote("ch_list_databases", {})
@@ -179,6 +210,7 @@ async def ch_list_tables(database: str | None = None) -> str:
     Args:
         database: Database name. If omitted, lists tables in the default database.
     """
+    _log_tool("ch_list_tables", database=database)
     if not _ch_enabled():
         if _REMOTE_SSE_URL:
             return await _call_remote("ch_list_tables", {"database": database} if database else {})
@@ -197,6 +229,7 @@ async def ch_describe_table(table: str, database: str | None = None) -> str:
         table: Table name.
         database: Database name. If omitted, uses the default database.
     """
+    _log_tool("ch_describe_table", table=table, database=database)
     if not _ch_enabled():
         if _REMOTE_SSE_URL:
             args = {"table": table}
@@ -221,6 +254,7 @@ async def ch_sample_data(table: str, database: str | None = None, limit: int = 1
         database: Database name. If omitted, uses the default database.
         limit: Number of rows to return (1-100, default 10).
     """
+    _log_tool("ch_sample_data", table=table, database=database, limit=limit)
     if not _ch_enabled():
         if _REMOTE_SSE_URL:
             args = {"table": table, "limit": limit}
@@ -269,6 +303,7 @@ async def search_elasticsearch(index: str, query_body: str, size: int | None = N
         - {"size": 0, "aggs": {"by_package": {"terms": {"field": "package_type"}}}}
         - {"query": {"range": {"date": {"gte": "2025-01-01"}}}}
     """
+    _log_tool("search_elasticsearch", index=index, query_body=query_body, size=size)
     if not _es_enabled():
         if _REMOTE_SSE_URL:
             args = {"index": index, "query_body": query_body}
@@ -288,6 +323,7 @@ async def es_list_indices() -> str:
 
     Use this to discover available download/package data indices.
     """
+    _log_tool("es_list_indices")
     if not _es_enabled():
         if _REMOTE_SSE_URL:
             return await _call_remote("es_list_indices", {})
@@ -305,6 +341,7 @@ async def es_get_mapping(index: str) -> str:
     Args:
         index: The index name to inspect.
     """
+    _log_tool("es_get_mapping", index=index)
     if not _es_enabled():
         if _REMOTE_SSE_URL:
             return await _call_remote("es_get_mapping", {"index": index})
@@ -325,6 +362,7 @@ async def es_sample_data(index: str, size: int = 10) -> str:
         index: The index name.
         size: Number of documents to return (1-100, default 10).
     """
+    _log_tool("es_sample_data", index=index, size=size)
     if not _es_enabled():
         if _REMOTE_SSE_URL:
             return await _call_remote("es_sample_data", {"index": index, "size": size})

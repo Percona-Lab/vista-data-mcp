@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily VISTA MCP usage report to Google Sheets webhook
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/dennis.kittrell/vista-data-mcp
+ExecStart=/home/dennis.kittrell/vista-data-mcp/scripts/report-vista-usage.sh
+# Keep stdout/stderr in the journal under this unit so the run itself is auditable.
+StandardOutput=journal
+StandardError=journal

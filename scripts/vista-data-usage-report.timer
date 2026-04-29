@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily VISTA MCP usage report (00:10 UTC, 5 min after percona-dk)
+
+[Timer]
+# Daily at 00:10 UTC. Offset 5 minutes from percona-dk's 00:05 UTC timer
+# so the two reports don't compete for journalctl read time.
+OnCalendar=*-*-* 00:10:00 UTC
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
