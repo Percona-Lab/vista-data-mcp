@@ -98,16 +98,22 @@ EOF
 
 echo "report: ${DATE} total=${TOTAL} peak=${PEAK_HOUR}h(${PEAK_COUNT}) distinct=${DISTINCT}"
 
-# Apps Script Web apps return HTTP 200 even when doPost throws — the body is
-# an HTML error page in that case. So we cannot rely on HTTP code alone; we
-# must inspect the body for the "ok" JSON our doPost emits on success.
+# Apps Script Web app response semantics — empirically determined:
+#   302 → ContentService output served successfully (the redirect target is
+#         a one-shot Google-served result page that requires a session;
+#         curl cannot follow it without auth, so we MUST NOT use -L).
+#         This is the success signal — same as percona-dk's pattern.
+#   200 + HTML body → uncaught exception in doPost. Apps Script swallowed
+#         it and rendered its generic error template. Surface the message.
+#   200 + JSON body → unusual but possible if Apps Script ever serves a
+#         non-redirected response. Treat as success.
+#   other → transport error.
 TMPBODY=$(mktemp)
 trap "rm -f $TMPBODY" EXIT
 
 CODE=$(curl -sS -X POST "$WEBHOOK_URL" \
     -H "Content-Type: application/json" \
     --max-time 30 \
-    -L \
     -o "$TMPBODY" \
     -w "%{http_code}" \
     --data "$PAYLOAD" 2>&1) || {
@@ -116,26 +122,17 @@ CODE=$(curl -sS -X POST "$WEBHOOK_URL" \
 }
 
 case "$CODE" in
+    302)
+        echo "report: posted (HTTP 302)"
+        ;;
     200|201|202|204)
-        # Inspect the body — Apps Script's doPost returns:
-        #   success → {"status":200,"msg":"ok"}
-        #   bad payload → {"status":4xx,"msg":"..."}
-        #   uncaught exception → HTML error page
-        if grep -q '"status":200' "$TMPBODY" 2>/dev/null; then
-            echo "report: posted (HTTP $CODE)"
-        elif grep -q '"status":' "$TMPBODY" 2>/dev/null; then
-            echo "report: webhook rejected — $(cat $TMPBODY)" >&2
-            exit 0
-        else
-            # HTML error page — extract the Exception text if present
+        # If body looks like HTML, doPost crashed — extract the message.
+        if grep -qiE '<html|<!DOCTYPE' "$TMPBODY" 2>/dev/null; then
             ERR=$(grep -oE 'Exception: [^<]+' "$TMPBODY" | head -1)
-            echo "report: Apps Script threw — ${ERR:-see $TMPBODY for HTML}" >&2
+            echo "report: Apps Script threw — ${ERR:-see body for HTML}" >&2
             exit 0
         fi
-        ;;
-    301|302|303|307|308)
-        # Shouldn't happen with -L (we follow); treat as success.
-        echo "report: posted (HTTP $CODE, redirect)"
+        echo "report: posted (HTTP $CODE)"
         ;;
     *)
         echo "report: webhook returned HTTP $CODE" >&2
